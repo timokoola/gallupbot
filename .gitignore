@@ -5,6 +5,9 @@
 
 # Keyfiles
 *.keys
+*.txt
+*.lock
+Timos-*
 
 # Packages
 *.egg
