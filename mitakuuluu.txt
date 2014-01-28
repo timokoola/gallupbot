@@ -1,0 +1,4 @@
+Mitä kuuluu?
+A) Hyvää
+B) Pahaa
+C) Ei oikein mitään
