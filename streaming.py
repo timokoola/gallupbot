@@ -1,26 +1,25 @@
 import tweepy, sys, os
 import argparse # requires 2.7
-import random, re, daemon, lockfile
-from pymongo import MongoClient
+import random, re, daemon, lockfile, datetime
 import json
+import sqlite3
 
 answerre = re.compile('([a-cA-C]+)')
-useraccount = "@gallupbot"
-db_collection = None
+useraccount = "@timotestikoola"
 
 def handle_command_line():
     parser = argparse.ArgumentParser(description="Run streaming twitter bot")
     parser.add_argument("-t", "--test", help="Get a test response")
     parser.add_argument("-k", "--keyfile", help="Twitter account consumer and accesstokens")
-    parser.add_argument("-u", "--username", help="Username to follow", default="@gallupbot")
+    parser.add_argument("-u", "--username", help="Username to follow", default=useraccount)
     parser.add_argument("-q", "--question", help="Question to tweet")
-    parser.add_argument("-s", "--summary", help="Get stats for the last tweeted question")
+    parser.add_argument("-s", "--summary", help="Get stats for the last tweeted question", action='store_true')
     args = parser.parse_args()
     return args
 
 
 class AnswerParser:
-    def __init__(self,description,prev):
+    def __init__(self,description, prev):
         mth = answerre.match(description)
         if not mth:
              mth = answerre.match(prev)
@@ -29,50 +28,17 @@ class AnswerParser:
         else:
             self.answer = "EMT"
 
-class ReplyGenerator:
-    def __init__(self,tweet):
-        self.tweet = tweet
-        dp = AnswerParser(tweet.split()[1],"EMT")
-        self.answer = dp.answer
-
-    def reply(self):
-        reply = "%s" % (self.answer)
-        return reply
-
+def store_answer(answer, status, name):
+    pass
 
 class CustomStreamListener(tweepy.StreamListener):
 
     def on_status(self, status):
-        
-        # We'll simply print some values in a tab-delimited format
-        # suitable for capturing to a flat file but you could opt 
-        # store them elsewhere, retweet select statuses, etc.
-
-
-
         try:
-            print "%s\t%s\t%s\t%s" % (status.text, 
-                                      status.author.screen_name, 
-                                      status.created_at, 
-                                      status.source,)
-            #yeah, needs refactoring
-            # first  find the latest status we have created
-            #self.tweepyapi.
-            latest_id = latest_question()["id"]
             name = status.author.screen_name
 
-            prev_answer = db_collection.find({"type": "answer", "name": name})
-
-            if prev_answer.count() > 0:
-                s = prev_answer[0]
-            else:
-                s = {}
-                s["text"] = status.text
-                s["name"] = name
-                s["timestamp"] = status.created_at
-            ap = AnswerParser(status.text)
-            s["answer"] = ap.answer
-            db_collection.save(s)
+            ap = AnswerParser(status.text, "EMT")
+            store_answer(ap.answer, status, name)
 
         except Exception, e:
             print >> sys.stderr, 'Encountered Exception:', e
@@ -121,15 +87,12 @@ def run(api):
     api.filter(track=[useraccount])
 
 def store_question(tweet):
-    qs = {}
-    qs["tweetid"] = tweet.id
-    qs["text"] = tweet.text
-    qs["type"] = "question"
-    qs["timestamp"] = tweet.created_at
-    db_collection.insert(qs) 
+    item = tweet.text.split("\n")
+    storable_item = (item[0], item[1], item[2], item[3], datetime.datetime.now().isoformat(), tweet.id)
+    c.execute('''INSERT INTO questions VALUES (NULL, ?, ?, ?, ?, ?, ?) ''', storable_item)
+    conn.commit()
+   
 
-def latest_question():
-    return db_collection.find({"type":"question"}).sort("_id", -1).limit(1)[0]
 
 def question_from_file(f):
     fr = open(f)
@@ -137,16 +100,9 @@ def question_from_file(f):
     fr.close
     return text
     
-def connect_to_db():
-    global db_collection
-    client = MongoClient()
-    db = client.answerstream
-    db_collection = db.answercollection
-
 
 if __name__ == "__main__":
     args = handle_command_line()
-    connect_to_db()
     useraccount = args.username
     api = (TweepyHelper(args.keyfile)).api
     if args.question:
@@ -155,7 +111,8 @@ if __name__ == "__main__":
         store_question(tweet)
         sys.exit(0)
     if args.summary:
-        print latest_question()
+        ltq = latest_question()
+        print ltq, ltq[-1]
         sys.exit(0)
 
     ferr = open("runningstreamingerrs.txt", "w+")
@@ -165,4 +122,5 @@ if __name__ == "__main__":
             run(api)
     else:
        run(api)
+    conn.close()
 
