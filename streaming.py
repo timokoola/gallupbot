@@ -89,7 +89,7 @@ def run(api):
 def store_question(tweet):
     item = tweet.text.split("\n")
     storable_item = (item[0], item[1], item[2], item[3], datetime.datetime.now().isoformat(), tweet.id)
-    c.execute('''INSERT INTO questions VALUES (NULL, ?, ?, ?, ?, ?, ?) ''', storable_item)
+    c.execute('''INSERT INTO questions VALUES (?) ''', storable_item)
     conn.commit()
    
 

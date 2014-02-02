@@ -1,5 +1,6 @@
 import sqlite3
 import datetime
+import codecs
 
 DATABASE = "tweets.db"
 TWEETID_FIELD = -1
@@ -16,7 +17,7 @@ class Question(object):
     @classmethod
     def create_from_file(cls, filename):
         """Create question from a file"""
-        f = open(filename)
+        f = codecs.open(filename, encoding="utf-8")
         lines = f.read().split("\n")
         f.close()
         return Question(lines[0],lines[1], lines[2], lines[3])
@@ -46,21 +47,21 @@ class DbFacade(object):
         self.cursor.execute('''CREATE TABLE IF NOT EXISTS questions (questionid INTEGER PRIMARY KEY, question TEXT, answer_a TEXT,answer_b TEXT, answer_c TEXT, timestamp text, tweetid TEXT) ''')
         self.cursor.execute('''CREATE TABLE IF NOT EXISTS answer (voteid INTEGER, vote TEXT, name TEXT, timestamp text, tweetid text, FOREIGN KEY(voteid) REFERENCES questions(questionid)) ''')
 
-    def set_current_question(self,question):
+    def set_current_question(self,question, tweet):
         """Set current question to the database"""
-        storable_item = (question.question, question.answer_a, question.answer_b, question.answer_c, datetime.datetime.now().isoformat(), tweet.id)
-        self.cursor.execute('''INSERT INTO questions VALUES (NULL, ?, ?, ?, ?, ?, ?) ''', storable_item)
-        self.conn.commit()
+        storable_item = (None,question.question, question.answer_a, question.answer_b, question.answer_c, datetime.datetime.now().isoformat(), tweet.id)
+        self.cursor.execute('''INSERT INTO questions VALUES (?, ?, ?, ?, ? ,?, ?) ''', storable_item)
+        self.connection.commit()
 
     def get_current_question(self):
         """Get the currently active question"""
         self.cursor.execute("select * from questions order by timestamp DESC limit 1")
         return self.cursor.fetchone()
 
-    def add_answer(self, name, question, answer):
+    def add_answer(self, name, answer):
         """Creates answer in current question
-        name is the username, question is the question being answered (original tweet), and answer"""
-        current_id = self.get_current_question[TWEETID_FIELD]
-        self.cursor.execute('REPLACE INTO answer (?)', (None, answer, name, datetime.datetime.now().isoformat(),question.selfid))
+        name is the username, and answer"""
+        current_id = self.get_current_question()[0]
+        self.cursor.execute('REPLACE INTO answer VALUES (?, ?, ?, ?, ?)', (None, answer, name, datetime.datetime.now().isoformat(),current_id))
         self.connection.commit()
 
